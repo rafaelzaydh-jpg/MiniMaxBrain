@@ -204,3 +204,9 @@ Exemplo de configuração modular recomendada:
 ## ⚖️ Licença
 
 MiniMaxBrain é source-available para uso pessoal e não comercial. Consulte [`LICENSE.md`](LICENSE.md) e [`COMMERCIAL.md`](COMMERCIAL.md).
+
+---
+
+## 🤝 Reconhecimentos e Origem
+
+Este é uma aplicação idealizada por humanos e construida com a ajuda de Inteligencia Artificial, grande parte do projeto já existia dentro do sistema Eyle Code Agent e apenas reutilizamos os fundamentos.
