@@ -1,0 +1,25 @@
+{
+  "schema_version": "mmb-external-gate-config-v1",
+  "model_map": "model.mmb-map.json",
+  "memory": {
+    "resident_experts": 16,
+    "kv_cache": "32MiB",
+    "scratch": "32MiB",
+    "transport": "heap",
+    "lease_timeout_seconds": 120
+  },
+  "io": {
+    "workers": 4,
+    "prefetch_queue": 32,
+    "integrity": "first_load"
+  },
+  "server": {
+    "host": "127.0.0.1",
+    "port": 55321,
+    "api_token": null,
+    "max_request_bytes": 1048576
+  },
+  "telemetry": {
+    "enabled": false
+  }
+}
