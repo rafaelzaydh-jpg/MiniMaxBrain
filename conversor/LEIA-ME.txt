@@ -1,0 +1,21 @@
+===================================================================
+       🧠 MiniMaxBrain (MMB) — Pasta de Entrada do Conversor
+===================================================================
+
+Como converter seu modelo GGUF para MiniMaxBrain:
+
+1. Cole o seu arquivo de modelo (com extensao .gguf) aqui dentro desta pasta.
+   Exemplo: 'qwen2.5-32b-instruct.Q4_K_M.gguf' ou 'granite-3.0-moe.gguf'.
+
+2. Volte para a pasta raiz do MiniMaxBrain e dê 2 cliques no arquivo:
+   'conversor.bat'
+
+3. O assistente ira:
+   - Detectar o arquivo .gguf automaticamente.
+   - Inspecionar e validar a topologia MoE.
+   - Fatiar os especialistas para o formato de alta performance .mmbw.
+   - Gerar a configuracao modular 'gate.json'.
+   - Criar o selo criptografico de seguranca 'model.verified.json'.
+
+4. Ao final, seu modelo estara pronto para ser executado com maxima
+   eficiencia e economia de RAM!
