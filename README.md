@@ -47,7 +47,7 @@ Carregar 100% dos pesos na memória RAM tradicional exige dezenas ou centenas de
 - 🚀 **Economia de até 87% de RAM**: Execute modelos de 35B (como o Qwen 3.6 MoE) alocando apenas **4 GiB de RAM**.
 - ⚡ **Zero-Overhead com Selo Criptográfico (`integrity: seal`)**: Validação pré-voo $O(1)$ que elimina o gargalo de SHA-256 no carregamento e libera a taxa de transferência bruta do SSD NVMe (>2.000 MB/s).
 - 🎛️ **Orçamento Modular por RAM (`ram_budget`)**: Você define quanta RAM quer dedicar (ex: `4GiB`, `8GiB`) e o MMB calcula dinamicamente a retenção de especialistas sem estourar seu computador.
-- 🖱️ **Automação 1-Clique no Windows**: Inclui `instalador.bat` para configurar o ambiente e `conversor.bat` com assistente interativo para fatiar arquivos `.gguf`.
+- 🖱️ **Automação 1-Clique no Windows**: Inclui `starter.bat` para instalar/iniciar e `conversor.bat` com assistente interativo para fatiar arquivos `.gguf`.
 - 📦 **Conversor Universal MoE**: Suporte nativo para **Qwen MoE** (2, 3, 3.5), **IBM Granite MoE** e qualquer modelo com tensores fundidos `blk.N.ffn_*_exps.weight`.
 - 🔒 **Memória Compartilhada e Zero-Copy**: Comunicação inter-processos (IPC) versionada com entrega direta de ponteiros de memória compartilhada.
 
@@ -184,7 +184,7 @@ Exemplo de configuração modular recomendada:
   - [x] Selo de integridade criptográfica pré-voo (`mmb seal`).
   - [x] Orçamento modular por bytes de RAM (`ram_budget`).
   - [x] Validação física e benchmarks no Qwen 3.6 35B MoE.
-  - [x] Scripts 1-clique (`instalador.bat` e `conversor.bat`).
+  - [x] Scripts 1-clique (`starter.bat` e `conversor.bat`).
 - [ ] **v0.3.0 — Backend Tensorial Integrado**: Execução direta dos kernels `gate/up/down` e tokenizador sobre os blocos paginados.
 - [ ] **v0.4.0 — Interface Web & Chat UI**: Servidor HTTP local no navegador (estilo `llama-server`) e API compatível com OpenAI `/v1/chat/completions`.
 - [ ] **v1.0.0 — Validação de Modelos de 1TB–2TB**: Inferência completa de MoEs de 2 Trilhões de parâmetros em PCs domésticos.
