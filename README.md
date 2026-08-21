@@ -71,8 +71,8 @@ Carregar 100% dos pesos na memória RAM tradicional exige dezenas ou centenas de
 
 ### Opção 1: No Windows (1 Clique — Recomendado) 🪟
 
-1. **Instale o Ambiente:**
-   Dê dois cliques em [`instalador.bat`](instalador.bat). Ele verifica o Python 3.11+, instala as dependências e valida a suíte de testes automaticamente.
+1. **Inicie o Ambiente:**
+   Dê dois cliques em [`starter.bat`](starter.bat). Ele verifica o Python 3.11+, instala/atualiza as dependências e inicializa o sistema com menu interativo.
 
 2. **Adicione o Modelo:**
    Coloque o seu arquivo `.gguf` (ex: `qwen-35b.gguf` ou `granite-moe.gguf`) dentro da pasta [`conversor/`](conversor/).
