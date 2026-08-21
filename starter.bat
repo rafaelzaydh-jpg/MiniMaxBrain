@@ -1,128 +1,206 @@
 @echo off
-setlocal
-title MiniMaxBrain - Starter
+setlocal EnableExtensions
+title MiniMaxBrain 0.3 - Direct MMB Runtime
 
-echo.
-echo =================================================================
-echo             [*] MiniMaxBrain (MMB) - Starter
-echo =================================================================
-echo.
-
-REM 1. Procura o executavel do Python
 set "PYTHON_CMD="
-
-python --version >nul 2>&1
-if not errorlevel 1 (
-    set "PYTHON_CMD=python"
-    goto :found_python
+python -c "import sys; raise SystemExit(0 if sys.version_info >= (3,11) else 1)" >nul 2>&1
+if not errorlevel 1 set "PYTHON_CMD=python"
+if not defined PYTHON_CMD (
+    py -3 -c "import sys; raise SystemExit(0 if sys.version_info >= (3,11) else 1)" >nul 2>&1
+    if not errorlevel 1 set "PYTHON_CMD=py -3"
+)
+if not defined PYTHON_CMD (
+    echo [ERRO] Python 3.11+ nao foi encontrado.
+    pause
+    exit /b 1
 )
 
-py -3 --version >nul 2>&1
-if not errorlevel 1 (
-    set "PYTHON_CMD=py -3"
-    goto :found_python
+cd /d "%~dp0"
+
+%PYTHON_CMD% -m pip install --quiet -e .
+if errorlevel 1 (
+    echo [ERRO] Falha ao instalar o pacote local.
+    pause
+    exit /b 1
 )
 
-if exist "%LOCALAPPDATA%\Programs\Python\Python312\python.exe" (
-    set "PYTHON_CMD=%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
-    goto :found_python
-)
+if not exist "%~dp0conversor" mkdir "%~dp0conversor"
+if not exist "%~dp0modelos" mkdir "%~dp0modelos"
 
-if exist "%LOCALAPPDATA%\Programs\Python\Python311\python.exe" (
-    set "PYTHON_CMD=%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
-    goto :found_python
-)
-
-if exist "C:\Python312\python.exe" (
-    set "PYTHON_CMD=C:\Python312\python.exe"
-    goto :found_python
-)
-
-if exist "C:\Python311\python.exe" (
-    set "PYTHON_CMD=C:\Python311\python.exe"
-    goto :found_python
-)
-
-echo [ERRO] Python 3.11+ nao foi encontrado!
-echo Por favor, instale o Python em: https://www.python.org/downloads/
-echo Lembre-se de marcar 'Add Python to PATH' durante a instalacao.
+:menu
+call :find_bundle
 echo.
+echo ================================================================
+echo             MiniMaxBrain 0.3 - MMB Direto
+echo ================================================================
+echo [1] Construir/testar backend nativo
+echo [2] Converter GGUF para MMBW
+echo [3] Preparar bundle MMBW ja convertido
+echo [4] Validar bundle
+echo [5] Testar pager MMBW
+echo [6] Chat direto MMB
+echo [7] Web/API direto MMB
+echo [8] Abrir pasta modelos
+echo [9] Sair
+echo ================================================================
+if defined CONFIG_PATH (
+    echo Bundle atual: %BUNDLE_PATH%
+    echo Config:       %CONFIG_PATH%
+) else if defined BUNDLE_PATH (
+    echo Bundle detectado sem gate.json: %BUNDLE_PATH%
+) else (
+    echo Bundle atual: nenhum bundle *-mmbw detectado
+)
+echo.
+set "opcao="
+set /p opcao="Opcao (1-9): "
+
+if "%opcao%"=="1" goto :native
+if "%opcao%"=="2" goto :convert
+if "%opcao%"=="3" goto :prepare
+if "%opcao%"=="4" goto :check
+if "%opcao%"=="5" goto :smoke
+if "%opcao%"=="6" goto :chat
+if "%opcao%"=="7" goto :web
+if "%opcao%"=="8" goto :folder
+if "%opcao%"=="9" goto :end
+echo Opcao invalida.
+goto :menu
+
+:find_bundle
+set "BUNDLE_PATH="
+set "CONFIG_PATH="
+for /d %%d in ("%~dp0conversor\*-mmbw") do (
+    if exist "%%d\model.mmb-map.json" (
+        set "BUNDLE_PATH=%%d"
+        if exist "%%d\gate.json" set "CONFIG_PATH=%%d\gate.json"
+    )
+)
+for /d %%d in ("%~dp0modelos\*-mmbw") do (
+    if exist "%%d\model.mmb-map.json" (
+        set "BUNDLE_PATH=%%d"
+        if exist "%%d\gate.json" set "CONFIG_PATH=%%d\gate.json"
+    )
+)
+exit /b 0
+
+:require_config
+if defined CONFIG_PATH exit /b 0
+if defined BUNDLE_PATH (
+    echo [*] Criando gate.json para o bundle existente...
+    %PYTHON_CMD% "%~dp0mmb.py" prepare --bundle "%BUNDLE_PATH%" --cache-gib 1
+    if errorlevel 1 exit /b 1
+    set "CONFIG_PATH=%BUNDLE_PATH%\gate.json"
+    exit /b 0
+)
+echo [ERRO] Nenhum bundle MMBW foi encontrado em conversor\ ou modelos\.
+echo Use a opcao [2] para converter ou [3] para informar um bundle existente.
 pause
 exit /b 1
 
-:found_python
-echo [1/3] Verificando e instalando dependencias...
-echo      Aguarde um momento...
-%PYTHON_CMD% -m pip install --quiet --upgrade pip
-%PYTHON_CMD% -m pip install --quiet -r "%~dp0requirements-dev.txt"
-%PYTHON_CMD% -m pip install --quiet -e "%~dp0."
-echo      [OK] Dependencias instaladas com sucesso!
-echo.
+:native
+cls
+echo [*] Ativando ambiente MSVC x64...
 
-echo [2/3] Validando ambiente com suíte de testes...
-%PYTHON_CMD% -m pytest -q "%~dp0tests"
-if errorlevel 1 (
-    echo      [AVISO] Alguns testes falharam, mas continuaremos a inicializacao.
+set "MMB_VSDEVCMD=C:\Program Files\Microsoft Visual Studio\18\Insiders\Common7\Tools\VsDevCmd.bat"
+if exist "%MMB_VSDEVCMD%" (
+    call "%MMB_VSDEVCMD%" -arch=x64
 ) else (
-    echo      [OK] Todos os 25 testes passaram com sucesso!
-)
-echo.
-
-echo [3/3] Inicializando MiniMaxBrain...
-if not exist "%~dp0conversor" (
-    mkdir "%~dp0conversor"
-)
-
-echo.
-echo =================================================================
-echo                 SISTEMA PRONTO PARA USO!
-echo =================================================================
-echo.
-echo Escolha o que deseja iniciar:
-echo.
-echo   [1] Iniciar o Conversor de Modelos (GGUF -> MMB)
-echo   [2] Rodar o Benchmark Real no Qwen 35B MoE (4GB RAM)
-echo   [3] Iniciar o Servidor Gate em Segundo Plano (mmb serve)
-echo   [4] Abrir a pasta 'conversor' para adicionar um modelo .gguf
-echo   [5] Sair
-echo.
-
-set /p opcao="Digite a opcao desejada (1-5): "
-
-if "%opcao%"=="1" (
-    cls
-    call "%~dp0conversor.bat"
-    exit /b 0
-)
-
-if "%opcao%"=="2" (
-    cls
-    echo Executando Benchmark A/B no Qwen 35B...
-    %PYTHON_CMD% -u -B "%~dp0tools\mmb_ab_compare.py" --config "%~dp0real_model_test\mmb-qwen-pageable\gate.ram.json" --tokens 2 --rounds 2
+    echo [ERRO] VsDevCmd.bat nao encontrado em:
+    echo        %MMB_VSDEVCMD%
     echo.
-    echo Pressione qualquer tecla para voltar ao menu...
-    pause >nul
-    goto :found_python
-)
-
-if "%opcao%"=="3" (
-    cls
-    echo Iniciando Servidor MiniMaxBrain Gate...
-    if exist "%~dp0real_model_test\mmb-qwen-pageable\gate.ram.json" (
-        %PYTHON_CMD% "%~dp0mmb.py" serve --config "%~dp0real_model_test\mmb-qwen-pageable\gate.ram.json"
-    ) else (
-        echo Nenhuma configuracao encontrada para iniciar o servidor.
-        pause
-    )
-    exit /b 0
-)
-
-if "%opcao%"=="4" (
-    start explorer "%~dp0conversor"
-    echo Pasta 'conversor' aberta!
+    echo Abra um Developer Command Prompt do Visual Studio 2026 e execute novamente.
     pause
-    exit /b 0
+    goto :menu
 )
 
-echo Saindo do MiniMaxBrain...
+where cl >nul 2>&1
+if errorlevel 1 (
+    echo.
+    echo [ERRO] O ambiente Visual Studio foi chamado, mas cl.exe ainda nao apareceu.
+    pause
+    goto :menu
+)
+
+where nmake >nul 2>&1
+if errorlevel 1 (
+    echo.
+    echo [ERRO] O ambiente Visual Studio foi chamado, mas nmake.exe ainda nao apareceu.
+    pause
+    goto :menu
+)
+
+echo [OK] MSVC ativado.
+where cl
+where nmake
+echo.
+
+%PYTHON_CMD% "%~dp0tools\build_native.py"
+if errorlevel 1 (
+    echo.
+    echo [ERRO] O backend nativo nao foi construido.
+) else (
+    echo.
+    echo [OK] Backend direto MMB compilado e testado.
+)
+echo.
+pause
+goto :menu
+
+:convert
+cls
+call "%~dp0conversor.bat"
+goto :menu
+
+:prepare
+cls
+set "BUNDLE_INPUT="
+set /p BUNDLE_INPUT="Cole o caminho completo da pasta *-mmbw: "
+if not defined BUNDLE_INPUT goto :menu
+%PYTHON_CMD% "%~dp0mmb.py" prepare --bundle "%BUNDLE_INPUT%" --cache-gib 1
+echo.
+pause
+goto :menu
+
+:check
+cls
+call :require_config
+if errorlevel 1 goto :menu
+%PYTHON_CMD% "%~dp0mmb.py" check --config "%CONFIG_PATH%"
+echo.
+pause
+goto :menu
+
+:smoke
+cls
+call :require_config
+if errorlevel 1 goto :menu
+%PYTHON_CMD% "%~dp0mmb.py" smoke --config "%CONFIG_PATH%" --blocks 4
+echo.
+pause
+goto :menu
+
+:chat
+cls
+call :require_config
+if errorlevel 1 goto :menu
+%PYTHON_CMD% "%~dp0mmb.py" chat --config "%CONFIG_PATH%" --tokens 128 --ctx 2048
+echo.
+pause
+goto :menu
+
+:web
+cls
+call :require_config
+if errorlevel 1 goto :menu
+%PYTHON_CMD% "%~dp0mmb.py" web --config "%CONFIG_PATH%" --port 8080 --open-browser --ctx 2048
+echo.
+pause
+goto :menu
+
+:folder
+start "" explorer "%~dp0modelos"
+goto :menu
+
+:end
 exit /b 0

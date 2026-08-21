@@ -1,30 +1,20 @@
 {
   "schema_version": "mmb-external-gate-config-v1",
-  "model_map": "model/model.mmb-map.json",
+  "model_map": "model.mmb-map.json",
   "memory": {
-    "ram_budget": "12GiB",
+    "ram_budget": "4GiB",
     "resident_experts": null,
-    "kv_cache": "2GiB",
-    "scratch": "1GiB",
-    "transport": "shared_memory",
+    "kv_cache": "512MiB",
+    "scratch": "256MiB",
     "lease_timeout_seconds": 120
   },
   "io": {
-    "workers": 2,
-    "prefetch_queue": 32,
-    "integrity": "first_load"
+    "integrity": "seal"
   },
   "server": {
     "host": "127.0.0.1",
-    "port": 55321,
+    "port": 8080,
     "api_token": null,
     "max_request_bytes": 1048576
-  },
-  "telemetry": {
-    "enabled": true
-  },
-  "model_memory": {
-    "enabled": true,
-    "path": "state/model-memory.sqlite3"
   }
 }

@@ -7,6 +7,7 @@ __pycache__/
 htmlcov/
 dist/
 build/
+native/build*/
 
 # Local environments and secrets
 .venv/

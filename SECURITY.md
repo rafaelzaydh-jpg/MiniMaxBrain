@@ -2,29 +2,34 @@
 
 ## Relato responsável
 
-Relate vulnerabilidades ao proprietário do repositório por um canal privado. Não publique exploração funcional, tokens, hashes sensíveis ou pesos de terceiros antes de haver oportunidade razoável de correção.
+Relate vulnerabilidades ao proprietário do repositório por canal privado. Inclua versão, plataforma, configuração relevante, impacto e reprodução mínima.
 
-Inclua versão/commit, plataforma, configuração relevante, impacto e reprodução mínima.
+Não envie pesos de modelos, tokens de API ou dados privados em relatórios públicos.
 
 ## Fronteiras atuais
 
-- O serviço usa loopback por padrão.
-- Bind fora de `127.0.0.1`, `localhost` ou `::1` exige um token de pelo menos 16 caracteres.
-- O protocolo de controle é JSON-lines e possui limite configurável de requisição.
-- O token é comparado em tempo constante.
-- Paths de configuração, banco, shards e fontes são confinados aos diretórios dos respectivos contratos.
-- Ranges fora do arquivo, sobrepostos ou desalinhados são rejeitados.
-- Integridade pode ser `always`, `first_load` ou `none`; use `always` para material não confiável.
-- O servidor não oferece escrita nos pesos nem desligamento remoto.
+- Web/API usa loopback por padrão.
+- Bind fora de `127.0.0.1`, `localhost` ou `::1` exige `server.api_token`.
+- Endpoints protegidos exigem `Authorization: Bearer <token>`.
+- O corpo HTTP possui limite configurável.
+- Caminhos do mapa/shards não podem escapar do diretório do bundle.
+- Ranges inválidos ou sobrepostos são rejeitados.
+- Políticas `integrity=always` e `first_load` verificam SHA-256 por bloco.
+- `integrity=seal` verifica o conjunto registrado no startup.
+- O runtime direto exige `MMB_CAP_PAGED_MOE_KERNEL` e `MMB_CAP_NATIVE_RUNTIME`.
+- Expert placeholders não são tratados como payload válido.
+- Não existe fallback silencioso para GGUF, `llama-server` ou geração sintética.
 
-## Memória compartilhada
+## Integridade do bundle
 
-No modo `shared_memory`, clientes locais autorizados recebem o nome e o range do segmento. Trate usuários locais com acesso ao mesmo host como parte da fronteira de confiança. O MMB remove o segmento quando o bloco é expulso ou o gate é fechado, mas um processo já autorizado pode ter copiado os bytes.
+O runtime valida contratos de mapa/layout, shapes, tipos e comprimentos codificados antes de entregar expert bytes ao kernel.
 
-## ModelMemory
+Leases impedem eviction enquanto um kernel ainda usa os ponteiros de um expert.
 
-O banco contém topologia física, caminhos, hashes e padrões de uso. Mantenha-o fora do Git e aplique as permissões adequadas do sistema operacional. O caminho configurado não pode escapar do diretório da configuração.
+O seal atual detecta corrupção/modificação, mas não autentica o autor/origem do bundle. Assinaturas digitais de distribuição são uma extensão separada.
 
 ## Limitações
 
-MiniMaxBrain ainda é um runtime Python experimental. Ele não substitui isolamento de processo, criptografia de disco, controle de acesso do host, sandbox do executor tensorial ou verificação de licença dos modelos utilizados.
+- O provider GGML é process-global; somente um runtime MMB deve ficar ativo por processo nesta versão.
+- O backend validado atualmente é o caminho CPU da build testada; novos backends exigem aceite próprio.
+- MiniMaxBrain não substitui controle de acesso do sistema operacional, criptografia de disco, sandbox ou verificação da licença dos modelos.

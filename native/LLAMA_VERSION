@@ -1,0 +1,5 @@
+PINNED
+build=b10218
+commit=de69995
+source=https://github.com/ggml-org/llama.cpp
+integration=mmb-0.3

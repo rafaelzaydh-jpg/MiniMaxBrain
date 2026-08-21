@@ -16,6 +16,7 @@ if hasattr(sys.stderr, "reconfigure"):
 ROOT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT_DIR))
 
+from minimaxbrain.bundle_config import prepare_bundle_config
 from minimaxbrain.config import load_external_bundle
 from minimaxbrain.gguf import gguf_summary, load_gguf
 from minimaxbrain.gguf_moe import pack_moe_gguf
@@ -99,38 +100,18 @@ def main() -> int:
         print(f"      [ERRO] Erro durante o empacotamento: {exc}")
         return 1
 
-    print("\n[3/4] Criando arquivo de configuracao modular (gate.json)...")
-    config_data = {
-        "schema_version": "mmb-external-gate-config-v1",
-        "model_map": "model.mmb-map.json",
-        "memory": {
-            "ram_budget": "4GiB",
-            "resident_experts": null,
-            "kv_cache": "512MiB",
-            "scratch": "256MiB",
-            "transport": "heap",
-            "lease_timeout_seconds": 120
-        },
-        "io": {
-            "workers": 2,
-            "prefetch_queue": 32,
-            "integrity": "seal"
-        },
-        "server": {
-            "host": "127.0.0.1",
-            "port": 55321
-        },
-        "telemetry": {
-            "enabled": true
-        },
-        "model_memory": {
-            "enabled": false,
-            "path": "state/model-memory.sqlite3"
-        }
-    }
-    config_path = output_dir / "gate.json"
-    config_path.write_text(json.dumps(config_data, indent=2), encoding="utf-8")
-    print(f"      ✔ Configuracao salva: {config_path.name}")
+    print("\n[3/4] Criando configuracao do runtime direto (gate.json)...")
+    try:
+        config_path = prepare_bundle_config(
+            output_dir,
+            expert_cache_bytes=1 << 30,
+            overwrite=True,
+        )
+        print(f"      ✔ Configuracao salva: {config_path.name}")
+        print("      ✔ Cache inicial de experts: 1 GiB")
+    except Exception as exc:
+        print(f"      [ERRO] Nao foi possivel criar gate.json: {exc}")
+        return 1
 
     print("\n[4/4] Gerando Selo Criptografico de Integridade Pre-Voo (mmb seal)...")
     try:
@@ -145,8 +126,12 @@ def main() -> int:
     print("CONVERSAO CONCLUIDA COM SUCESSO!")
     print("=" * 65)
     print(f"Pasta do modelo pronto: {output_dir.resolve()}\n")
-    print("Para iniciar o servico do Gate com este modelo:")
-    print(f"   python mmb.py serve --config {config_path.relative_to(ROOT_DIR)}\n")
+    print("Para testar o pager nativo:")
+    print("   python tools/build_native.py")
+    print(f"   python mmb.py smoke --config {config_path.relative_to(ROOT_DIR)} --blocks 4\n")
+    print("Para usar inferencia MMB direta (sem GGUF no runtime):")
+    print(f"   python mmb.py chat --config {config_path.relative_to(ROOT_DIR)}")
+    print(f"   python mmb.py web  --config {config_path.relative_to(ROOT_DIR)} --open-browser")
     return 0
 
 

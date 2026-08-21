@@ -1,174 +1,146 @@
-# Formato físico do Gate Externo
+# Formato físico MMB 0.3
 
-## Separação de contratos
+O conversor oficial aceita um GGUF MoE suportado e produz um bundle autocontido para execução paged:
 
-Há dois documentos diferentes:
-
-- **pack plan**: entrada descartável produzida por um conversor específico do modelo;
-- **physical model map**: contrato runtime imutável usado pelo gate.
-
-O gate externo não interpreta tensor names, hidden size ou função dos experts. O backend sabe como usar os bytes; o mapa diz somente onde eles estão.
-
-## Pack plan v1
-
-Schema: `mmb-pack-plan-v1`.
-
-```json
-{
-  "schema_version": "mmb-pack-plan-v1",
-  "model": {
-    "id": "meu-moe-q4",
-    "architecture": "minha-arquitetura-moe",
-    "parameter_count": "2T",
-    "quantization": {"name": "q4", "bits_per_weight": 4},
-    "backend_contract": "meu-backend-v1",
-    "map_revision": "weights-2026-08-20"
-  },
-  "alignment": 4096,
-  "shard_size": "64GiB",
-  "blocks": [
-    {"id": "core.embeddings", "kind": "core", "source": "converted/core.embeddings.bin"},
-    {
-      "id": "layer.0.expert.0", "kind": "expert",
-      "source": "converted/layer.0.expert.0.bin", "layer": 0, "expert": 0
-    }
-  ]
-}
+```text
+bundle/
+  gate.json
+  model.mmb-map.json
+  model.mmb-layout.json
+  model.mmb-meta.gguf
+  model-00000.mmbw
+  model.verified.json   # quando seal está habilitado
 ```
 
-Regras:
+## `model.mmb-map.json`
 
-- fontes são relativas ao diretório do plan e não podem escapar dele;
-- cada fonte contém um bloco completo no layout esperado pelo backend;
-- IDs e pares `(layer, expert)` são únicos;
-- core não possui `layer`/`expert`;
-- arquivos vazios são rejeitados;
-- output existente nunca é sobrescrito;
-- escrita usa diretório parcial e promoção ao fim;
-- cópia e SHA-256 são streaming.
+É a autoridade dos ranges físicos. Cada bloco contém:
 
-Comando:
+- `id`;
+- `kind` (`core` ou `expert`);
+- `shard`;
+- `offset`;
+- `length`;
+- `alignment`;
+- `sha256`.
 
-```powershell
-python mmb.py pack --plan pack-plan.json --output model
+Experts também possuem `layer` e `expert`.
+
+Ranges não podem escapar do diretório do modelo, sobrepor outro bloco ou ultrapassar o shard.
+
+## `model.mmb-layout.json`
+
+O schema atual é `mmb-gguf-moe-layout-v2` e o contrato do backend é `mmb-raw-ggml-expert-segments-v2`.
+
+O layout registra:
+
+- arquitetura e identidade do GGUF de origem;
+- topologia MoE (`layer_count`, `expert_count`, `active_experts_per_token`);
+- core tensors;
+- para cada layer, segmentos `down`, `gate` e `up`;
+- `ggml_type` e shapes;
+- shape fused de origem;
+- eixo do expert;
+- stride codificado por expert;
+- metadata-only GGUF associado.
+
+Cada bloco físico `(layer, expert)` contém:
+
+```text
+down | gate | up
 ```
 
-## Adaptador GGUF GraniteMoE
+Os segmentos precisam cobrir o bloco de forma contígua e manter o encoding GGML original.
 
-O adaptador direto lê o diretório GGUF sem dependências externas e aceita somente o layout explicitamente suportado `granitemoe`, com tensores `blk.N.ffn_{down,gate,up}_exps.weight` e eixo final de especialistas.
+## `model.mmb-meta.gguf`
 
-```powershell
-python mmb.py gguf-inspect --gguf model.gguf
-python mmb.py gguf-pack-moe --gguf model.gguf --output model-mmb
+Preserva metadados e descritores necessários para reconstruir o modelo no `llama.cpp`, sem duplicar o payload completo dos pesos.
+
+Inclui, quando presentes na origem:
+
+- arquitetura;
+- tokenizer;
+- special tokens;
+- chat template;
+- parâmetros do modelo;
+- nomes, shapes e tipos dos tensors.
+
+O layout registra tamanho e SHA-256 do metadata file.
+
+## `.mmbw`
+
+Os shards contêm os bytes GGML copiados sem dequantização ou re-quantização.
+
+Core tensors são armazenados como blocos próprios.
+
+Os routed expert weights são separados por `(layer, expert)` e organizados em segmentos `down/gate/up`.
+
+## `gate.json`
+
+A versão atual ainda usa o schema de configuração herdado `mmb-external-gate-config-v1` por compatibilidade.
+
+No runtime direto ele fornece principalmente:
+
+- caminho do mapa;
+- budget de memória/cache;
+- política de integridade;
+- configuração HTTP.
+
+O nome/schema será simplificado em uma versão futura; isso não altera o formato MMBW.
+
+## Validação
+
+`mmb check` valida de forma fail-closed:
+
+- mapa físico;
+- paths e ranges;
+- topologia;
+- cardinalidade de rotas;
+- correspondência layout/mapa;
+- cobertura de segmentos;
+- core tensors;
+- metadata GGUF e SHA-256;
+- seal quando configurado.
+
+O backend C++ repete as invariantes críticas ao abrir o modelo.
+
+## Selo
+
+`mmb seal` gera `model.verified.json`.
+
+O selo detecta alteração de dados registrados no bundle. Ele fornece integridade; não é uma assinatura de procedência do modelo.
+
+## Execução atual
+
+O formato é consumido diretamente por:
+
+```text
+model.mmb-meta.gguf
+      +
+core MMBW
+      ↓
+MMBLlamaRuntime / llama.cpp
+      ↓
+router real
+      ↓
+GGML_OP_MUL_MAT_ID
+      ↓
+MMBPager
+      ↓
+expert MMBW
 ```
 
-O conversor:
+Os routed expert weights usam `MMB_MOE_PLACEHOLDER`, sem backing físico completo.
 
-- valida arquitetura, número de camadas, especialistas totais e `top-k` treinado;
-- exige os três tensores MoE em todas as camadas;
-- fatia bytes GGML codificados sem desquantizar;
-- cria um bloco por `(layer, expert)` na ordem `down`, `gate`, `up`;
-- cria blocos core individuais e fixos;
-- calcula SHA-256 do GGUF, do mapa e de cada bloco por streaming;
-- produz `model.mmb-layout.json` com o contrato tensorial reduzido;
-- recusa tipos, nomes ou formas que não possa provar fisicamente.
+Quando o router seleciona experts, o provider MMB entrega ao kernel GGML os segmentos adquiridos do `.mmbw`.
 
-O contrato produzido é `mmb-raw-ggml-expert-concat-v1`. Outros layouts MoE exigem adaptadores explícitos; o gate continua sem interpretar nomes de tensor.
+Uma execução paged só é registrada depois do compute real; apenas carregar um expert para a cache não ativa `paged_experts_used`.
 
-## Physical model map v1
+## GGUF original
 
-Schema: `mmb-physical-model-map-v1`.
+Depois que o bundle está convertido, o GGUF original não é necessário para o chat direto.
 
-```json
-{
-  "schema_version": "mmb-physical-model-map-v1",
-  "model": {
-    "id": "meu-moe-q4",
-    "architecture": "minha-arquitetura-moe",
-    "parameter_count": 2000000000000,
-    "quantization": {"name": "q4", "bits_per_weight": 4.0},
-    "backend_contract": "meu-backend-v1",
-    "map_revision": "weights-2026-08-20"
-  },
-  "blocks": [
-    {
-      "id": "layer.0.expert.0", "kind": "expert",
-      "shard": "shards/model-00000.mmbw", "offset": 4096, "length": 536870912,
-      "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-      "alignment": 4096, "layer": 0, "expert": 0
-    }
-  ]
-}
-```
+Ele continua necessário para:
 
-Validações runtime:
-
-- versão exata e ausência de campos desconhecidos;
-- paths confinados e shard existente;
-- range dentro do arquivo e offset alinhado;
-- SHA-256 sintaticamente válido;
-- ranges não sobrepostos;
-- IDs e rotas únicos.
-
-## Configuração externa v1
-
-Use `mmb.example.json` como base. Exatamente um modo de orçamento deve ser materializado.
-
-Por RAM:
-
-```json
-"memory": {
-  "ram_budget": "12GiB", "resident_experts": null,
-  "kv_cache": "2GiB", "scratch": "1GiB",
-  "transport": "shared_memory", "lease_timeout_seconds": 120
-}
-```
-
-Por slots residentes:
-
-```json
-"memory": {
-  "ram_budget": null, "resident_experts": 4,
-  "kv_cache": "2GiB", "scratch": "1GiB",
-  "transport": "shared_memory", "lease_timeout_seconds": 120
-}
-```
-
-No modo por slots, o runtime calcula RAM usando o maior expert do mapa.
-
-Memória estrutural opcional:
-
-```json
-"model_memory": {
-  "enabled": true,
-  "path": "state/model-memory.sqlite3"
-}
-```
-
-O banco fica vinculado à identidade e à revisão exata do mapa. O caminho é relativo ao arquivo de configuração e não pode escapar desse diretório.
-
-## IPC v1
-
-Schema envelope: `mmb-external-gate-ipc-v1`. O transporte de controle é uma mensagem JSON por conexão TCP, terminada por newline.
-
-Prefetch:
-
-```json
-{
-  "protocol": "mmb-external-gate-ipc-v1", "op": "prefetch", "api_token": null,
-  "request_id": "seq-1-token-2", "map_revision": "weights-2026-08-20",
-  "items": [{"block_id": "layer.8.expert.12", "priority": 10}]
-}
-```
-
-Acquire obrigatório:
-
-```json
-{
-  "protocol": "mmb-external-gate-ipc-v1", "op": "acquire", "api_token": null,
-  "request_id": "seq-1-token-2-layer-8", "map_revision": "weights-2026-08-20",
-  "block_ids": ["layer.8.expert.12"]
-}
-```
-
-Resposta inclui `lease_id` e, para cada bloco, `name`, `offset` e `length` de memória compartilhada. O cliente mapeia o handle e chama `release` depois que o kernel termina.
+- gerar um bundle novo;
+- repetir o aceite A/B contra a baseline original.

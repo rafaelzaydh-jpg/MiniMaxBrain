@@ -1,17 +1,11 @@
-# Documentação do MiniMaxBrain
+# Documentação
 
-Comece pelo [`README.md`](../README.md), que descreve o estado atual, os limites e a comparação real.
+O estado funcional do projeto está resumido no [`README.md`](../README.md).
 
-## Contratos atuais
+Documentos principais:
 
-- [`external-gate-architecture.md`](external-gate-architecture.md) — divisão entre gate externo, executor e futuro gate interno;
-- [`model-format.md`](model-format.md) — pack plan, mapa físico, configuração e IPC;
-- [`memory-kernel.md`](memory-kernel.md) — grafo estrutural persistente e perfil de rotas.
+- [`runtime-architecture.md`](runtime-architecture.md): caminho de inferência MMB direto, pager, leases, placeholder e integração GGML.
+- [`model-format.md`](model-format.md): contrato físico do bundle `.mmbw`.
+- [`../REAL_TESTS.md`](../REAL_TESTS.md): protocolo de regressão e aceite real GGUF × MMB.
 
-## Evidência experimental
-
-- [`../real_model_test/README.md`](../real_model_test/README.md) — execução, conversão, paginação e IPC com modelo real;
-- [`../real_model_test/COMPARISON.md`](../real_model_test/COMPARISON.md) — A/B sem prefetch, com ajuda exata e modelo integral;
-- [`../real_model_test/REPORT.md`](../real_model_test/REPORT.md) — relatório técnico da validação.
-
-Documentos descrevem somente funcionalidades presentes no repositório. Funcionalidades futuras são marcadas explicitamente como não implementadas.
+A documentação histórica da fase anterior ao runtime direto foi removida da árvore ativa para evitar contratos conflitantes.

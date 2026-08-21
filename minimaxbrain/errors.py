@@ -40,11 +40,14 @@ class LeaseError(MMBError):
     code = "LEASE_INVALID"
 
 
-class ProtocolError(MMBError):
-    code = "PROTOCOL_INVALID"
+class BackendUnavailableError(MMBError):
+    """No real inference backend is ready to generate model output."""
+
+    code = "BACKEND_UNAVAILABLE"
 
 
-class ModelMemoryError(MMBError):
-    """The persistent structural memory is invalid or revision-conflicted."""
+class InferenceError(MMBError):
+    """A real backend failed while executing an inference request."""
 
-    code = "MODEL_MEMORY_INVALID"
+    code = "INFERENCE_FAILED"
+

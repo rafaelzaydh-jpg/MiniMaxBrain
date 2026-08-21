@@ -1,0 +1,20 @@
+{
+  "schema_version": "mmb-external-gate-config-v1",
+  "model_map": "model.mmb-map.json",
+  "memory": {
+    "ram_budget": 2315919872,
+    "kv_cache": 0,
+    "scratch": 0,
+    "transport": "heap",
+    "lease_timeout_seconds": 120.0
+  },
+  "io": {
+    "integrity": "first_load"
+  },
+  "server": {
+    "host": "127.0.0.1",
+    "port": 8080,
+    "api_token": null,
+    "max_request_bytes": 1048576
+  }
+}

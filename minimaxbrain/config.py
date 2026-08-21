@@ -18,8 +18,8 @@ _MEMORY_FIELDS = {
 }
 _IO_FIELDS = {"workers", "prefetch_queue", "integrity"}
 _SERVER_FIELDS = {"host", "port", "api_token", "max_request_bytes"}
-_TELEMETRY_FIELDS = {"enabled"}
-_MODEL_MEMORY_FIELDS = {"enabled", "path"}
+_LEGACY_TELEMETRY_FIELDS = {"enabled"}
+_LEGACY_MODEL_MEMORY_FIELDS = {"enabled", "path"}
 
 
 def _object(value: Any, where: str) -> Dict[str, Any]:
@@ -48,7 +48,6 @@ class MemoryConfig:
     max_resident_experts: int | None
     kv_cache_bytes: int
     scratch_bytes: int
-    transport: str
     lease_timeout_seconds: float
     budget_mode: str
 
@@ -59,8 +58,6 @@ class MemoryConfig:
 
 @dataclass(frozen=True)
 class IoConfig:
-    workers: int
-    prefetch_queue: int
     integrity: str
 
 
@@ -73,20 +70,12 @@ class ServerConfig:
 
 
 @dataclass(frozen=True)
-class ModelMemoryConfig:
-    enabled: bool
-    path: Path
-
-
-@dataclass(frozen=True)
 class ExternalGateConfig:
     path: Path
     model_map_path: Path
     memory: MemoryConfig
     io: IoConfig
     server: ServerConfig
-    telemetry_enabled: bool
-    model_memory: ModelMemoryConfig
 
 
 def _resolve_inside(base: Path, value: str, field: str) -> Path:
@@ -136,19 +125,25 @@ def load_external_config(path: str | Path, model_map: PhysicalModelMap | None = 
         # when expert blocks have different encoded lengths.
         ram = kv + scratch + model_map.core_bytes + slots * model_map.largest_expert_bytes
     transport = memory.get("transport", "heap")
-    if transport not in {"heap", "shared_memory"}:
-        raise ConfigurationError("memory.transport must be 'heap' or 'shared_memory'")
+    if transport != "heap":
+        raise ConfigurationError(
+            "memory.transport must be 'heap'; shared_memory transport was removed"
+        )
     lease_timeout = memory.get("lease_timeout_seconds", 120.0)
     if isinstance(lease_timeout, bool) or not isinstance(lease_timeout, (int, float)) or lease_timeout <= 0:
         raise ConfigurationError("memory.lease_timeout_seconds must be positive")
 
     io = _object(root.get("io", {}), "io")
     _reject_unknown(io, _IO_FIELDS, "io")
-    workers = _int(io.get("workers", 2), "io.workers", minimum=1, maximum=64)
-    queue_depth = _int(io.get("prefetch_queue", 32), "io.prefetch_queue", minimum=0, maximum=100000)
+    # workers/prefetch_queue are accepted only so v0.2 bundles still open.
+    # Prefetch was removed until real paged inference exists.
+    if "workers" in io:
+        _int(io["workers"], "io.workers", minimum=1, maximum=64)
+    if "prefetch_queue" in io:
+        _int(io["prefetch_queue"], "io.prefetch_queue", minimum=0, maximum=100000)
     integrity = io.get("integrity", "first_load")
-    if integrity not in {"always", "first_load", "none", "seal", "crc32", "async"}:
-        raise ConfigurationError("io.integrity must be always, first_load, none, seal, crc32, or async")
+    if integrity not in {"always", "first_load", "none", "seal"}:
+        raise ConfigurationError("io.integrity must be always, first_load, none, or seal")
 
     server = _object(root.get("server", {}), "server")
     _reject_unknown(server, _SERVER_FIELDS, "server")
@@ -165,21 +160,17 @@ def load_external_config(path: str | Path, model_map: PhysicalModelMap | None = 
         server.get("max_request_bytes", 1 << 20), "server.max_request_bytes", minimum=1024, maximum=64 << 20
     )
 
-    telemetry = _object(root.get("telemetry", {}), "telemetry")
-    _reject_unknown(telemetry, _TELEMETRY_FIELDS, "telemetry")
-    telemetry_enabled = telemetry.get("enabled", True)
-    if not isinstance(telemetry_enabled, bool):
+    # Compatibility only: the old telemetry switch is accepted but ignored.
+    legacy_telemetry = _object(root.get("telemetry", {}), "telemetry")
+    _reject_unknown(legacy_telemetry, _LEGACY_TELEMETRY_FIELDS, "telemetry")
+    if "enabled" in legacy_telemetry and not isinstance(legacy_telemetry["enabled"], bool):
         raise ConfigurationError("telemetry.enabled must be boolean")
 
-    model_memory_raw = _object(root.get("model_memory", {}), "model_memory")
-    _reject_unknown(model_memory_raw, _MODEL_MEMORY_FIELDS, "model_memory")
-    model_memory_enabled = model_memory_raw.get("enabled", False)
-    if not isinstance(model_memory_enabled, bool):
-        raise ConfigurationError("model_memory.enabled must be boolean")
-    model_memory_path_raw = model_memory_raw.get("path", "model-memory.sqlite3")
-    if not isinstance(model_memory_path_raw, str) or not model_memory_path_raw.strip():
-        raise ConfigurationError("model_memory.path must be a non-empty relative path")
-    model_memory_path = _resolve_inside(config_path.parent, model_memory_path_raw, "model_memory.path")
+    # Compatibility only: v0.2 bundles may still contain model_memory.
+    # The subsystem was removed from the runtime because it is not required for
+    # physical paging or inference. Validate shape, then deliberately ignore it.
+    legacy_model_memory = _object(root.get("model_memory", {}), "model_memory")
+    _reject_unknown(legacy_model_memory, _LEGACY_MODEL_MEMORY_FIELDS, "model_memory")
 
     result = ExternalGateConfig(
         path=config_path,
@@ -189,14 +180,11 @@ def load_external_config(path: str | Path, model_map: PhysicalModelMap | None = 
             max_resident_experts=slots,
             kv_cache_bytes=kv,
             scratch_bytes=scratch,
-            transport=transport,
             lease_timeout_seconds=float(lease_timeout),
             budget_mode=budget_mode,
         ),
-        io=IoConfig(workers=workers, prefetch_queue=queue_depth, integrity=integrity),
+        io=IoConfig(integrity=integrity),
         server=ServerConfig(host=host.strip(), port=port, api_token=token, max_request_bytes=max_request),
-        telemetry_enabled=telemetry_enabled,
-        model_memory=ModelMemoryConfig(enabled=model_memory_enabled, path=model_memory_path),
     )
     if model_map is not None:
         validate_feasibility(result, model_map)

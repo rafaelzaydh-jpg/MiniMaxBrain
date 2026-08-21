@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "minimaxbrain"
-version = "0.2.0"
-description = "Independent SSD-to-RAM weight gate for sparse and MoE language models"
+version = "0.3.1"
+description = "Direct paged-MMB MoE runtime integrated with llama.cpp/GGML"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {file = "LICENSE.md"}

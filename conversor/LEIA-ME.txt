@@ -1,21 +1,39 @@
 ===================================================================
-       🧠 MiniMaxBrain (MMB) — Pasta de Entrada do Conversor
+        MiniMaxBrain (MMB) — Conversão GGUF -> MMBW
 ===================================================================
 
-Como converter seu modelo GGUF para MiniMaxBrain:
+1. Coloque um GGUF MoE suportado nesta pasta ou informe o caminho
+   completo quando o assistente solicitar.
+2. Execute conversor.bat.
+3. O conversor:
+   - valida a topologia MoE;
+   - copia os bytes GGML sem dequantizar/re-quantizar;
+   - gera model.mmb-map.json;
+   - gera model.mmb-layout.json;
+   - gera model.mmb-meta.gguf;
+   - grava os pesos em model-*.mmbw;
+   - cria gate.json;
+   - cria/verifica o selo quando configurado.
 
-1. Cole o seu arquivo de modelo (com extensao .gguf) aqui dentro desta pasta.
-   Exemplo: 'qwen2.5-32b-instruct.Q4_K_M.gguf' ou 'granite-3.0-moe.gguf'.
+Depois da conversão, o runtime normal usa diretamente o bundle MMB:
 
-2. Volte para a pasta raiz do MiniMaxBrain e dê 2 cliques no arquivo:
-   'conversor.bat'
+  Python
+    -> mmb_backend.dll
+    -> MMBLlamaRuntime
+    -> router real
+    -> MMBPager
+    -> experts .mmbw
+    -> GGML MUL_MAT_ID
 
-3. O assistente ira:
-   - Detectar o arquivo .gguf automaticamente.
-   - Inspecionar e validar a topologia MoE.
-   - Fatiar os especialistas para o formato de alta performance .mmbw.
-   - Gerar a configuracao modular 'gate.json'.
-   - Criar o selo criptografico de seguranca 'model.verified.json'.
+O GGUF original não é necessário para o chat diário. Ele continua útil
+como origem para novas conversões e como baseline de aceite A/B.
 
-4. Ao final, seu modelo estara pronto para ser executado com maxima
-   eficiencia e economia de RAM!
+Para um bundle já convertido, NAO reconverta. Use:
+
+  python mmb.py prepare --bundle "CAMINHO\modelo-mmbw" --cache-gib 1
+
+Depois:
+
+  python mmb.py chat --bundle "CAMINHO\modelo-mmbw" --ctx 2048 --tokens 128
+
+Consulte ..\README.md e ..\REAL_TESTS.md.

@@ -6,8 +6,9 @@ import pytest
 
 from minimaxbrain.errors import ManifestError
 from minimaxbrain.gguf import gguf_summary, load_gguf
-from minimaxbrain.gguf_moe import GGUF_MOE_BACKEND_CONTRACT, pack_granitemoe_gguf
+from minimaxbrain.gguf_moe import GGUF_MOE_BACKEND_CONTRACT, pack_granitemoe_gguf, validate_moe_layout
 from minimaxbrain.model_map import load_model_map
+from minimaxbrain.storage import create_model_seal, verify_model_seal
 
 
 def _u32(value: int) -> bytes:
@@ -93,8 +94,15 @@ def test_granitemoe_packer_splits_fused_experts_without_dequantizing(tmp_path):
 
     manifest_path = pack_granitemoe_gguf(source, tmp_path / "packed", alignment=32)
     model_map = load_model_map(manifest_path)
+    meta_path = manifest_path.parent / "model.mmb-meta.gguf"
 
+    assert meta_path.is_file()
+    assert meta_path.stat().st_size == load_gguf(source).tensor_data_offset
     assert model_map.backend_contract == GGUF_MOE_BACKEND_CONTRACT
+    layout = validate_moe_layout(model_map)
+    assert layout["schema_version"] == "mmb-gguf-moe-layout-v2"
+    assert layout["metadata_gguf"]["file_name"] == "model.mmb-meta.gguf"
+    assert layout["expert_routes"] == 2
     assert len(model_map.core_blocks) == 1
     assert len(model_map.expert_blocks) == 2
     first = model_map.route_block(0, 0)
@@ -105,3 +113,39 @@ def test_granitemoe_packer_splits_fused_experts_without_dequantizing(tmp_path):
         assert struct.unpack("<3f", handle.read(first.length)) == (10.0, 20.0, 30.0)
         handle.seek(second.offset)
         assert struct.unpack("<3f", handle.read(second.length)) == (11.0, 21.0, 31.0)
+
+
+def test_layout_validator_rejects_tampered_metadata_gguf(tmp_path):
+    source = tmp_path / "tiny-moe.gguf"
+    source.write_bytes(_small_packable_moe_gguf())
+
+    manifest_path = pack_granitemoe_gguf(source, tmp_path / "packed", alignment=32)
+    model_map = load_model_map(manifest_path)
+    meta_path = manifest_path.parent / "model.mmb-meta.gguf"
+
+    data = bytearray(meta_path.read_bytes())
+    data[-1] ^= 0x01
+    meta_path.write_bytes(data)
+
+    with pytest.raises(ManifestError, match="metadata GGUF SHA-256 mismatch"):
+        validate_moe_layout(model_map)
+
+
+def test_model_seal_binds_layout_and_metadata(tmp_path):
+    source = tmp_path / "tiny-moe.gguf"
+    source.write_bytes(_small_packable_moe_gguf())
+    manifest_path = pack_granitemoe_gguf(source, tmp_path / "packed", alignment=32)
+    model_map = load_model_map(manifest_path)
+
+    seal = create_model_seal(model_map)
+    assert seal["schema_version"] == "mmb-model-seal-v2"
+    assert set(seal["auxiliary_files"]) == {"model.mmb-layout.json", "model.mmb-meta.gguf"}
+    assert verify_model_seal(model_map) == (True, None)
+
+    layout_path = manifest_path.parent / "model.mmb-layout.json"
+    layout = layout_path.read_text(encoding="utf-8")
+    layout_path.write_text(layout.replace('"expert_storage"', '"expert_storagf"', 1), encoding="utf-8")
+
+    valid, reason = verify_model_seal(model_map)
+    assert valid is False
+    assert reason and "model.mmb-layout.json sha256 modified" in reason
