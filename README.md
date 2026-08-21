@@ -4,6 +4,15 @@ MiniMaxBrain é um runtime independente de paginação de pesos para LLMs espars
 
 O componente entregue é o **gate externo**. Ele é comparável ao papel operacional de um gerenciador de memória física: controla a residência física, integridade por selo criptográfico, leases e fila de I/O assíncrona para permitir que modelos gigantescos rodem em hardware de consumo com RAM limitada.
 
+> [!IMPORTANT]
+> **⚠️ Transparência sobre o Estado Atual do Projeto:**
+> - **O que o MMB É hoje:** Um *runtime* de controle físico de pesos (SSD ➔ RAM compartilhada) com orçamentos restritos de memória, conversor GGUF automatizado e selo de integridade pré-voo.
+> - **O que o MMB AINDA NÃO É:** Ele **não é uma interface de chat pronta no navegador** (como o `llama-server` ou `Ollama`). O componente atual gerencia a movimentação física dos pesos para alimentar um executor, mas ainda não inclui os kernels tensoriais embutidos para gerar texto ponta a ponta sozinho na tela.
+> - **Roadmap do Projeto:**
+>   - ✅ **Fase 1 (Entregue - v0.2.0):** Porteiro físico externo, IPC de memória compartilhada, selo criptográfico `seal`, conversor GGUF 1-clique e orçamento modular de RAM.
+>   - ⏳ **Fase 2 (Em Desenvolvimento):** Conexão dos kernels tensoriais (`down/gate/up`) e do router da LLM diretamente sobre os blocos paginados pelo MMB.
+>   - 🎯 **Fase 3 (Planejado):** Servidor HTTP local com WebUI (aba de chat visual no navegador estilo `llama-server`) e API compatível com OpenAI (`/v1/chat/completions`).
+
 ---
 
 ## 📊 Comparativo: LLM Convencional (Normal) vs MiniMaxBrain (MMB)
