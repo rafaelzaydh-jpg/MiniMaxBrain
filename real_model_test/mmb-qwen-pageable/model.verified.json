@@ -1,0 +1,17 @@
+{
+  "map_mtime_ns": 1787275981539957200,
+  "map_revision": "sha256:faae766ad5d1e09551a0f4deff9a3e8aa49618515d10e9fcae79f4e96ad4c178",
+  "map_sha256": "1c9f993b729c816a72afa4b8f12cb03535d3caeb28bfb1ee466a34ba8109ab72",
+  "model_id": "Qwen3.6 35B A3B",
+  "schema_version": "mmb-model-seal-v1",
+  "shards": {
+    "model-00000.mmbw": {
+      "crc32": 2785281210,
+      "mtime_ns": 1787275923150727200,
+      "sha256": "5c45982b779ddcb762ba168e1b6f08b7b451c5ac40c2616f146612cbb58f40e4",
+      "size_bytes": 12953825280
+    }
+  },
+  "total_blocks": 11126,
+  "verified_at": 1787280261.3594263
+}

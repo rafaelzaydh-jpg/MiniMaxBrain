@@ -147,8 +147,8 @@ def load_external_config(path: str | Path, model_map: PhysicalModelMap | None = 
     workers = _int(io.get("workers", 2), "io.workers", minimum=1, maximum=64)
     queue_depth = _int(io.get("prefetch_queue", 32), "io.prefetch_queue", minimum=0, maximum=100000)
     integrity = io.get("integrity", "first_load")
-    if integrity not in {"always", "first_load", "none"}:
-        raise ConfigurationError("io.integrity must be always, first_load, or none")
+    if integrity not in {"always", "first_load", "none", "seal", "crc32", "async"}:
+        raise ConfigurationError("io.integrity must be always, first_load, none, seal, crc32, or async")
 
     server = _object(root.get("server", {}), "server")
     _reject_unknown(server, _SERVER_FIELDS, "server")

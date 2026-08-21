@@ -2,10 +2,10 @@
   "schema_version": "mmb-external-gate-config-v1",
   "model_map": "model.mmb-map.json",
   "memory": {
-    "ram_budget": "4GiB",
-    "resident_experts": null,
-    "kv_cache": "512MiB",
-    "scratch": "256MiB",
+    "ram_budget": null,
+    "resident_experts": 16,
+    "kv_cache": "32MiB",
+    "scratch": "32MiB",
     "transport": "heap",
     "lease_timeout_seconds": 120
   },
@@ -19,10 +19,6 @@
     "port": 55321
   },
   "telemetry": {
-    "enabled": true
-  },
-  "model_memory": {
-    "enabled": false,
-    "path": "state/model-memory.sqlite3"
+    "enabled": false
   }
 }

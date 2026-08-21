@@ -14,6 +14,7 @@ from .gguf_moe import pack_moe_gguf
 from .model_map import load_model_map, public_map_summary
 from .packer import pack_from_plan
 from .server import serve_gate
+from .storage import create_model_seal, verify_model_seal
 from .units import format_bytes, parse_bytes, parse_count
 
 
@@ -44,11 +45,33 @@ def _gguf_pack_moe(args: argparse.Namespace) -> int:
     return 0
 
 
+def _seal(args: argparse.Namespace) -> int:
+    config, model_map = load_external_bundle(args.config)
+    seal_data = create_model_seal(model_map)
+    _json({
+        "ok": True,
+        "seal": {
+            "model_id": seal_data["model_id"],
+            "map_revision": seal_data["map_revision"],
+            "verified_at": seal_data["verified_at"],
+            "total_blocks": seal_data["total_blocks"],
+            "shards": list(seal_data["shards"].keys()),
+        },
+    })
+    return 0
+
+
 def _check(args: argparse.Namespace) -> int:
     config, model_map = load_external_bundle(args.config)
+    sealed, seal_reason = verify_model_seal(model_map)
     result = {
         "ok": True,
         "model": public_map_summary(model_map),
+        "integrity": {
+            "configured_mode": config.io.integrity,
+            "sealed": sealed,
+            "seal_status": "valid" if sealed else (seal_reason or "not sealed"),
+        },
         "budget": {
             "mode": config.memory.budget_mode,
             "ram_budget_bytes": config.memory.ram_budget_bytes,
@@ -165,7 +188,10 @@ def build_parser() -> argparse.ArgumentParser:
     gguf_pack_parser.add_argument("--output", required=True)
     gguf_pack_parser.add_argument("--alignment", type=int, default=4096)
     gguf_pack_parser.set_defaults(handler=_gguf_pack_moe)
-    check_parser = sub.add_parser("check", help="validate a complete gate configuration")
+    seal_parser = sub.add_parser("seal", help="verify all blocks and write a tamper-proof integrity seal")
+    seal_parser.add_argument("--config", required=True)
+    seal_parser.set_defaults(handler=_seal)
+    check_parser = sub.add_parser("check", help="validate a complete gate configuration and seal status")
     check_parser.add_argument("--config", required=True)
     check_parser.set_defaults(handler=_check)
     smoke_parser = sub.add_parser("smoke", help="physically prefetch, acquire, and release blocks")

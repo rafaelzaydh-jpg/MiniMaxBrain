@@ -17,6 +17,7 @@ from minimaxbrain.model_memory import ModelMemory
 from minimaxbrain.protocol import IPC_PROTOCOL, validate_request
 from minimaxbrain.packer import PACK_PLAN_SCHEMA, pack_from_plan
 from minimaxbrain.server import ExternalGateServer
+from minimaxbrain.storage import create_model_seal, verify_model_seal
 from minimaxbrain.telemetry import MemoryTelemetry
 
 
@@ -26,7 +27,7 @@ def _sha(value: bytes) -> str:
 
 def _fixture(tmp_path: Path, *, transport: str = "heap", slots: int | None = None):
     model_dir = tmp_path / "model"
-    model_dir.mkdir()
+    model_dir.mkdir(parents=True, exist_ok=True)
     payloads = {
         "core": b"CORE",
         "l0e0": b"EXPERT00",
@@ -327,3 +328,71 @@ def test_streaming_packer_produces_aligned_valid_map(tmp_path):
     assert model_map.parameter_count == 2_000_000_000_000
     assert model_map.block("l0e0").offset == 16
     assert model_map.block("l0e0").sha256 == _sha(b"expert-data")
+
+
+def test_model_seal_creation_and_tamper_detection(tmp_path):
+    config_path, payloads = _fixture(tmp_path)
+    config, model_map = load_external_bundle(config_path)
+
+    # Initial state: not sealed
+    valid, reason = verify_model_seal(model_map)
+    assert not valid
+    assert "does not exist" in str(reason)
+
+    # Create seal
+    seal_data = create_model_seal(model_map)
+    assert seal_data["model_id"] == "tiny-moe"
+    assert seal_data["total_blocks"] == 4
+
+    # Verify valid seal
+    valid, reason = verify_model_seal(model_map)
+    assert valid
+    assert reason is None
+
+    # Tamper with shard content by modifying weights.bin
+    shard_file = tmp_path / "model" / "weights.bin"
+    shard_file.write_bytes(shard_file.read_bytes() + b"\x00")
+
+    # Verification must fail closed immediately
+    valid, reason = verify_model_seal(model_map)
+    assert not valid
+    assert "size modified" in str(reason)
+
+
+def test_external_gate_seal_integrity_mode(tmp_path):
+    config_path, payloads = _fixture(tmp_path)
+    config, model_map = load_external_bundle(config_path)
+
+    # Update config to integrity: seal without sealing first -> must fail on gate start
+    config_data = json.loads(config_path.read_text(encoding="utf-8"))
+    config_data["io"]["integrity"] = "seal"
+    config_path.write_text(json.dumps(config_data), encoding="utf-8")
+
+    config, model_map = load_external_bundle(config_path)
+    with pytest.raises(IntegrityError, match="model seal verification failed"):
+        with ExternalGate(config, model_map) as gate:
+            pass
+
+    # Seal the model
+    create_model_seal(model_map)
+
+    # Gate should start and read blocks at full speed
+    with ExternalGate(config, model_map) as gate:
+        lease = gate.acquire(["l0e0"], request_id="seal-test")
+        assert len(lease["blocks"]) == 1
+        gate.release(lease["lease_id"])
+
+
+def test_external_gate_crc32_and_async_modes(tmp_path):
+    for mode in ("crc32", "async"):
+        config_path, payloads = _fixture(tmp_path / f"test_{mode}")
+        config_data = json.loads(config_path.read_text(encoding="utf-8"))
+        config_data["io"]["integrity"] = mode
+        config_path.write_text(json.dumps(config_data), encoding="utf-8")
+
+        config, model_map = load_external_bundle(config_path)
+        with ExternalGate(config, model_map) as gate:
+            lease = gate.acquire(["l0e0"], request_id=f"test-{mode}")
+            assert len(lease["blocks"]) == 1
+            gate.release(lease["lease_id"])
+

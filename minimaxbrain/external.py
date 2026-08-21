@@ -54,7 +54,7 @@ class ExternalGate:
             max_expert_entries=config.memory.max_resident_experts,
         )
         self.arena = PayloadArena(config.memory.transport)
-        self.store = FileRangeStore(config.io.integrity, self.telemetry)
+        self.store = FileRangeStore(config.io.integrity, self.telemetry, model_map=self.model_map)
         self.scheduler = LoadScheduler(
             self.cache,
             self.store,
@@ -258,6 +258,7 @@ class ExternalGate:
         for lease_id in lease_ids:
             self.release(lease_id, missing_ok=True)
         self.scheduler.close()
+        self.store.close()
         self.cache.close()
         if self._owns_model_memory and self.model_memory is not None:
             self.model_memory.close()
