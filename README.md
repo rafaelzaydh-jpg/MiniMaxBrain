@@ -83,7 +83,17 @@ O gate externo é a autoridade sobre a residência física. Ele não escolhe sig
 
 ## 🚀 Como Usar
 
-### 1. Instalação
+### ⚡ Início Rápido no Windows (1 Clique)
+
+1. **Instale o ambiente:** Dê 2 cliques no arquivo [`instalador.bat`](file:///c:/Users/Kel/Desktop/nvopokea/MiniMaxBrain/instalador.bat) na raiz do projeto. Ele verifica o Python, instala as dependências e valida a suíte de testes automaticamente.
+2. **Adicione o modelo:** Coloque seu arquivo `.gguf` dentro da pasta [`conversor/`](file:///c:/Users/Kel/Desktop/nvopokea/MiniMaxBrain/conversor).
+3. **Converta e Sele:** Dê 2 cliques no arquivo [`conversor.bat`](file:///c:/Users/Kel/Desktop/nvopokea/MiniMaxBrain/conversor.bat). Ele reconhece o modelo automaticamente, fatia os especialistas, gera a configuração modular `gate.json` e cria o selo de integridade pré-voo!
+
+---
+
+### 💻 Uso Manual via Linha de Comando (CLI)
+
+#### 1. Instalação Manual
 
 Requer Python 3.11 ou superior (usa apenas a biblioteca padrão):
 
