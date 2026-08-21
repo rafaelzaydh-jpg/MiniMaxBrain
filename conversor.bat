@@ -1,62 +1,54 @@
 @echo off
-setlocal
+setlocal EnableExtensions
 title MiniMaxBrain - Conversor de Modelos GGUF
+cd /d "%~dp0"
+set "ROOT=%CD%"
 
 echo.
 echo =================================================================
-echo       [*] MiniMaxBrain (MMB) - Conversor Automatico GGUF
+echo       MiniMaxBrain 0.3 - Conversor GGUF para MMBW
 echo =================================================================
 echo.
 
-REM Procura o executavel do Python
-set "PYTHON_CMD="
+set "PYTHON_EXE="
+set "PYTHON_ARGS="
 
-python --version >nul 2>&1
+if defined MMB_PYTHON_EXE (
+    set "PYTHON_EXE=%MMB_PYTHON_EXE%"
+    set "PYTHON_ARGS=%MMB_PYTHON_ARGS%"
+    goto :run_wizard
+)
+
+if exist "%ROOT%\runtime\python\python.exe" (
+    set "PYTHON_EXE=%ROOT%\runtime\python\python.exe"
+    goto :run_wizard
+)
+
+python -c "import sys; raise SystemExit(0 if sys.version_info >= (3,11) else 1)" >nul 2>&1
 if not errorlevel 1 (
-    set "PYTHON_CMD=python"
+    set "PYTHON_EXE=python"
     goto :run_wizard
 )
 
-py -3 --version >nul 2>&1
+py -3 -c "import sys; raise SystemExit(0 if sys.version_info >= (3,11) else 1)" >nul 2>&1
 if not errorlevel 1 (
-    set "PYTHON_CMD=py -3"
+    set "PYTHON_EXE=py"
+    set "PYTHON_ARGS=-3"
     goto :run_wizard
 )
 
-if exist "%LOCALAPPDATA%\Programs\Python\Python312\python.exe" (
-    set "PYTHON_CMD=%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
-    goto :run_wizard
+echo [*] Python nao encontrado. Preparando runtime portatil oficial...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%\tools\bootstrap_portable_python.ps1" -ProjectRoot "%ROOT%"
+if errorlevel 1 (
+    echo [ERRO] Nao foi possivel preparar Python.
+    pause
+    exit /b 1
 )
-
-if exist "%LOCALAPPDATA%\Programs\Python\Python311\python.exe" (
-    set "PYTHON_CMD=%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
-    goto :run_wizard
-)
-
-if exist "C:\Python312\python.exe" (
-    set "PYTHON_CMD=C:\Python312\python.exe"
-    goto :run_wizard
-)
-
-if exist "C:\Python311\python.exe" (
-    set "PYTHON_CMD=C:\Python311\python.exe"
-    goto :run_wizard
-)
-
-echo [ERRO] Python 3.11+ nao foi encontrado no sistema!
-echo Por favor, instale o Python ou marque a opcao 'Add Python to PATH' durante a instalacao.
-echo Baixe em: https://www.python.org/downloads/
-echo.
-pause
-exit /b 1
+set "PYTHON_EXE=%ROOT%\runtime\python\python.exe"
 
 :run_wizard
-if not exist "%~dp0conversor" (
-    mkdir "%~dp0conversor"
-)
-
-%PYTHON_CMD% "%~dp0tools\conversor_wizard.py"
+if not exist "%ROOT%\conversor" mkdir "%ROOT%\conversor"
+"%PYTHON_EXE%" %PYTHON_ARGS% "%ROOT%\tools\conversor_wizard.py"
 
 echo.
-echo Pressione qualquer tecla para fechar...
-pause >nul
+pause

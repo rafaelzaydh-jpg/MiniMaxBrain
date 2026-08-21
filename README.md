@@ -53,6 +53,7 @@ MiniMaxBrain 0.3 has a functional direct runtime for supported MoE layouts.
 | Lease-protected eviction | ✅ Functional |
 | SHA-256 block validation | ✅ Functional |
 | Persistent native llama runtime | ✅ Functional |
+| Prebuilt Windows x64 backend | ✅ Included in user release |
 | Terminal chat | ✅ Functional |
 | Built-in Web UI / HTTP API | ✅ Functional |
 | GGUF required after conversion | ❌ No |
@@ -193,68 +194,67 @@ Format details: [`docs/model-format.md`](docs/model-format.md)
 
 # Quick start — Windows
 
-The repository includes both user-facing tools and development sources.
+The **user release is prebuilt**. Normal users do **not** need Visual Studio, CMake or a native compilation step.
 
-For the current source distribution, the native backend must be compiled once on the machine.
+## User requirements
 
-## Requirements
+- Windows 10 or 11 x64
+- x64 CPU compatible with the shipped backend (the validated build uses AVX2/FMA/F16C)
+- enough storage for the converted MMBW bundle
 
-- Windows x64
-- Python 3.11+
-- CMake 3.20+
-- Visual Studio / Build Tools with MSVC C++ x64/x86
+`starter.bat` resolves the remaining runtime pieces automatically:
 
-The Python runtime itself has **no third-party runtime dependencies** beyond the Python standard library.
+1. it uses `runtime\python\python.exe` when a portable Python is already present;
+2. otherwise it uses an installed Python 3.11+;
+3. if Python is missing, it downloads and verifies the official CPython 3.11 embeddable package into `runtime\python`;
+4. it loads the shipped backend from `runtime\windows-x64\mmb_backend.dll`;
+5. if Windows is missing the Microsoft Visual C++ runtime required by that DLL, the starter can install the official Microsoft x64 redistributable.
 
-### 1. Open MiniMaxBrain
+The MMB Python runtime has no third-party package dependencies, so `pip install` is not part of normal startup.
 
-Run:
+## Open MiniMaxBrain
+
+Extract the release and run:
 
 ```text
 starter.bat
 ```
 
-For an already converted bundle, the normal flow is:
+For an already converted bundle placed under `modelos\` or `conversor\`:
 
 ```text
-[1] Build/test native backend
-[3] Prepare existing MMBW bundle
-[6] Direct MMB chat
+[3] Prepare existing MMBW bundle   # only when gate.json is missing
+[6] Direct terminal chat
+[7] Web Chat / API
 ```
 
-Or use:
+If the bundle already contains `gate.json`, simply choose **[6]** or **[7]**.
+
+The prebuilt backend lives at:
 
 ```text
-[7] Direct MMB Web/API
+runtime\windows-x64\mmb_backend.dll
 ```
 
-### MSVC environment
+The source tree remains included for people who want to modify the runtime, but building it is a **developer workflow**, available under `[D] Ferramentas de desenvolvedor`.
 
-If `cl.exe` and `nmake.exe` are not visible, run MiniMaxBrain from a Visual Studio **Developer Command Prompt** or activate the x64 environment with the appropriate `VsDevCmd.bat -arch=x64` for your Visual Studio installation.
+## Developer build
 
----
-
-## Build manually
-
-Install the local Python package:
-
-```bat
-python -m pip install -e .
-```
-
-Build the backend:
+Developers who change `native/` can rebuild with:
 
 ```bat
 python tools\build_native.py
 ```
 
-A Windows Release build normally produces:
+or use the developer menu in `starter.bat`.
+
+A successful developer build produces:
 
 ```text
 native\build\Release\mmb_backend.dll
 ```
 
-The build also runs the native MMB and GGML tests.
+and the starter promotes that DLL back into the user-facing `runtime\windows-x64\` path.
 
 ---
 
@@ -342,6 +342,17 @@ POST /v1/chat/completions
 ```
 
 The chat endpoint supports the model's own chat template and full conversation history.
+
+The built-in Web UI intentionally keeps one vertical scroll surface for the conversation:
+
+- header and composer stay inside the viewport;
+- only the message history scrolls;
+- streaming follows the newest token while the user remains near the bottom;
+- scrolling upward detaches auto-follow and reveals a **“Mais recente”** control;
+- the message composer grows only to a bounded height and then scrolls internally;
+- tokens/s remains visible while deeper pager/runtime metrics stay under **Detalhes**.
+
+No Flask, Node.js or front-end build is required at runtime.
 
 ---
 

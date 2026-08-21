@@ -99,6 +99,10 @@ def _candidate_library_paths() -> list[Path]:
         else ("libmmb_backend.so", "libmmb_backend.dylib")
     )
     dirs = [
+        # User-facing release path. A GitHub ZIP/release can run without a
+        # local C++ toolchain when this prebuilt backend is present.
+        root / "runtime" / "windows-x64",
+        # Developer/build fallbacks.
         root / "native" / "build" / "Release",
         root / "native" / "build",
         root / "native" / "bin",
@@ -127,14 +131,23 @@ class NativeLibrary:
         resolved = find_native_backend(path)
         if resolved is None:
             raise BackendUnavailableError(
-                "mmb_backend native library was not found; build native/ first"
+                "mmb_backend native library was not found. "
+                "Expected the prebuilt release at runtime/windows-x64/"
+                "mmb_backend.dll; developers can rebuild it with "
+                "python tools/build_native.py"
             )
         self.path = resolved
         try:
             self.lib = ctypes.CDLL(str(resolved))
         except OSError as exc:
+            hint = ""
+            if os.name == "nt":
+                hint = (
+                    " If Windows reports a missing MSVCP/VCRUNTIME/VCOMP DLL, "
+                    "install the Microsoft Visual C++ v14 x64 Redistributable."
+                )
             raise BackendUnavailableError(
-                f"cannot load native MMB backend {resolved}: {exc}"
+                f"cannot load native MMB backend {resolved}: {exc}.{hint}"
             ) from exc
         self._bind()
         abi = int(self.lib.mmb_abi_version())

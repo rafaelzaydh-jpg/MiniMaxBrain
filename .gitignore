@@ -32,3 +32,6 @@ state/
 Thumbs.db
 .vscode/
 .idea/
+
+# Bootstrapped user runtime (downloaded on first use when needed)
+runtime/python/

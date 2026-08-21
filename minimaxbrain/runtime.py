@@ -145,6 +145,13 @@ class MMBRuntime:
         self.backend_error: str | None = None
         self.inference_mode = InferenceMode.UNAVAILABLE
         self._closed = False
+        self._last_generation_stats: Dict[str, Any] = {
+            "tokens_generated": 0,
+            "tokens_per_second": None,
+            "ttft_ms": None,
+            "generation_elapsed_ms": 0.0,
+            "decode_elapsed_ms": 0.0,
+        }
         self._init_backend()
 
     def _load_layout(self) -> Dict[str, Any]:
@@ -171,7 +178,9 @@ class MMBRuntime:
         if find_native_backend() is None:
             self.backend_error = (
                 "mmb_backend native library not found. "
-                "Build it with: python tools/build_native.py"
+                "The user release should include runtime/windows-x64/"
+                "mmb_backend.dll. Developers can rebuild it with "
+                "python tools/build_native.py."
             )
             return
 
@@ -308,6 +317,7 @@ class MMBRuntime:
         assert self.backend is not None
 
         started = time.perf_counter()
+        first_piece_at: float | None = None
         chunks = 0
         for piece in self.backend.stream_chat(
             normalized,
@@ -316,13 +326,38 @@ class MMBRuntime:
             top_p=top_p,
             top_k=top_k,
         ):
+            now = time.perf_counter()
             chunks += 1
-            elapsed = max(time.perf_counter() - started, 1e-9)
+            if first_piece_at is None:
+                first_piece_at = now
+
+            elapsed = max(now - started, 1e-9)
+            decode_elapsed = max(now - first_piece_at, 0.0)
+            tokens_per_second = (
+                (chunks - 1) / decode_elapsed
+                if chunks > 1 and decode_elapsed > 0.0
+                else None
+            )
+            generation_stats = {
+                "tokens_generated": chunks,
+                "tokens_per_second": (
+                    round(tokens_per_second, 3)
+                    if tokens_per_second is not None
+                    else None
+                ),
+                "ttft_ms": round((first_piece_at - started) * 1000.0, 2),
+                "generation_elapsed_ms": round(elapsed * 1000.0, 2),
+                "decode_elapsed_ms": round(decode_elapsed * 1000.0, 2),
+            }
+            # Replace the snapshot atomically so /api/stats never observes a
+            # partially updated generation record.
+            self._last_generation_stats = generation_stats
+
             pager_stats = self.backend.stats()
             yield piece, {
                 "chunk_idx": chunks,
-                "latency_ms": round(elapsed * 1000.0, 2),
-                "tokens_per_second": None,
+                "latency_ms": generation_stats["generation_elapsed_ms"],
+                **generation_stats,
                 "inference_mode": self.inference_mode.value,
                 "backend_rss_bytes": _process_rss_bytes(os.getpid()),
                 "expert_cache_bytes": int(
@@ -389,6 +424,7 @@ class MMBRuntime:
             ),
             "native_pager_error": None if self.backend is not None else self.backend_error,
             "native_pager": pager_stats,
+            "generation": dict(self._last_generation_stats),
         }
 
     def close(self) -> None:

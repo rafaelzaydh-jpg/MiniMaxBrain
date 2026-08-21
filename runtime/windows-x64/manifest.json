@@ -1,0 +1,15 @@
+{
+  "schema": "mmb-prebuilt-runtime-v1",
+  "platform": "windows-x64",
+  "mmb_version": "0.3.1",
+  "abi_version": 3,
+  "file": "mmb_backend.dll",
+  "sha256": "e5685b77adf7093159e5745127e22319cbeaf7e7957ddfd8dfe40385409bae13",
+  "bytes": 3741696,
+  "llama_version": "PINNED\nbuild=b10218\ncommit=de69995\nsource=https://github.com/ggml-org/llama.cpp\nintegration=mmb-0.3",
+  "built_from": "native/build/Release/mmb_backend.dll",
+  "notes": [
+    "User runtime artifact; no Visual Studio/CMake build is required to run MiniMaxBrain.",
+    "The DLL uses the Microsoft Visual C++ v14 runtime; starter.bat can bootstrap the official redistributable when necessary."
+  ]
+}
