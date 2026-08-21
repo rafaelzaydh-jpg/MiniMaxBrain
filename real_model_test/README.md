@@ -145,18 +145,14 @@ O Porteiro pode permanecer em outro processo, mas não pode operar como caixa-pr
 ```text
 real_model_test/
   README.md                         esta documentação
-  REPORT.md                         validação completa do modelo real
+  REPORT.md                         validação completa do modelo Granite
+  REPORT_QWEN.md                    validação completa do modelo Qwen 35B
   COMPARISON.md                     metodologia e números detalhados do A/B
   .gitignore                        impede commit acidental dos binários grandes
   downloads/                        GGUF e ZIP do runner; não versionados
   runner/                           executáveis locais de referência; não versionados
-  mmb-granite-pageable/
-    model.mmb-map.json             mapa físico e hashes por bloco
-    model.mmb-layout.json          layout tensorial reduzido
-    gate.experts.json           limite por especialistas residentes
-    gate.ram.json               teto por RAM
-    gate.shared.json            serviço externo com memória compartilhada
-    model-00000.mmbw                 shard gerado; não versionado
+  mmb-granite-pageable/             configurações e mapas do Granite MoE
+  mmb-qwen-pageable/                configurações, mapas e selo do Qwen 35B MoE
 ```
 
 Código relacionado:
